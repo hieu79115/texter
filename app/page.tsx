@@ -5,12 +5,72 @@ export default function Home() {
   const [text, setText] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const textDisplayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.focus();
     }
   }, []);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!textDisplayRef.current) return;
+
+    const rect = textDisplayRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const document = window.document;
+    let position = 0;
+
+    if (document.caretPositionFromPoint) {
+      const caretPosition = document.caretPositionFromPoint(e.clientX, e.clientY);
+      if (caretPosition) {
+        const preRange = document.createRange();
+        preRange.setStart(textDisplayRef.current, 0);
+        preRange.setEnd(caretPosition.offsetNode, caretPosition.offset);
+
+        const selectedText = preRange.toString();
+        position = selectedText.length;
+      }
+    }
+    else if (document.caretRangeFromPoint) {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range) {
+
+        const preRange = document.createRange();
+        preRange.setStart(textDisplayRef.current, 0);
+        preRange.setEnd(range.startContainer, range.startOffset);
+
+        const selectedText = preRange.toString();
+        position = selectedText.length;
+      }
+    }
+    else {
+      const lines = text.split("\n");
+      const lineHeight = 24;
+      const charWidth = 12;
+
+      const lineIndex = Math.floor(y / lineHeight);
+      if (lineIndex >= 0 && lineIndex < lines.length) {
+        let charsBeforeLine = 0;
+        for (let i = 0; i < lineIndex; i++) {
+          charsBeforeLine += lines[i].length + 1;
+        }
+
+        const charIndexInLine = Math.floor(x / charWidth);
+        position = charsBeforeLine + Math.min(charIndexInLine, lines[lineIndex].length);
+      } else {
+        position = text.length;
+      }
+    }
+
+    setCursorPosition(Math.min(position, text.length));
+
+    if (containerRef.current) {
+      containerRef.current.focus();
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     e.preventDefault();
@@ -162,6 +222,7 @@ export default function Home() {
       style={{ outline: "none" }}
     >
       <div
+        ref={textDisplayRef}
         className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-2xl mx-auto p-6 rounded overflow-hidden"
         style={{
           overflowWrap: "break-word",
@@ -170,6 +231,7 @@ export default function Home() {
           maxHeight: "80vh",
           overflow: "auto",
         }}
+        onClick={handleClick}
       >
         {renderText()}
       </div>
