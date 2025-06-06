@@ -9,6 +9,7 @@ export default function Home() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const textDisplayRef = useRef<HTMLDivElement>(null);
+  const cursorRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -24,6 +25,27 @@ export default function Home() {
       setHistoryIndex(newHistory.length - 1);
     }
   }, [text]);
+
+  useEffect(() => {
+    scrollCursorIntoView();
+  }, [cursorPosition, text]);
+
+  const scrollCursorIntoView = () => {
+    if (cursorRef.current && textDisplayRef.current) {
+      const cursorElement = cursorRef.current;
+      const container = textDisplayRef.current;
+
+      const cursorRect = cursorElement.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+
+      if (cursorRect.bottom > containerRect.bottom) {
+        container.scrollTop += cursorRect.bottom - containerRect.bottom + 20; // Add 20px margin
+      }
+      else if (cursorRect.top < containerRect.top) {
+        container.scrollTop -= containerRect.top - cursorRect.top + 20; // Add 20px margin
+      }
+    }
+  };
 
   const getTextSelection = () => {
     if (selectedText.start === -1 || selectedText.end === -1) {
@@ -94,14 +116,11 @@ export default function Home() {
   const handleClick = (e: React.MouseEvent) => {
     const clickPosition = calculateClickPosition(e);
 
-    // Clear any existing selection unless shift is pressed
     if (!e.shiftKey) {
       clearSelection();
     } else if (selectedText.start === -1) {
-      // If shift is pressed and no selection exists, start from current cursor
       setSelectedText({ start: cursorPosition, end: clickPosition });
     } else {
-      // If shift is pressed and selection exists, extend it
       setSelectedText(prev => ({ ...prev, end: clickPosition }));
     }
 
@@ -112,20 +131,17 @@ export default function Home() {
     }
   };
 
-  // Add mouse events for drag selection
   const handleMouseDown = (e: React.MouseEvent) => {
     const clickPosition = calculateClickPosition(e);
     setCursorPosition(clickPosition);
     setSelectedText({ start: clickPosition, end: clickPosition });
 
-    // Enable focus for keyboard events
     if (containerRef.current) {
       containerRef.current.focus();
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    // Only track movement if mouse button is pressed
     if (e.buttons === 1 && selectedText.start !== -1) {
       const movePosition = calculateClickPosition(e);
       setSelectedText(prev => ({ ...prev, end: movePosition }));
@@ -136,7 +152,7 @@ export default function Home() {
   const handleMouseUp = (e: React.MouseEvent) => {
     const upPosition = calculateClickPosition(e);
 
-    // If no movement happened, clear selection
+
     if (selectedText.start === selectedText.end) {
       clearSelection();
     }
@@ -144,10 +160,9 @@ export default function Home() {
     setCursorPosition(upPosition);
   };
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Handle keyboard shortcuts
     if (e.ctrlKey) {
       switch (e.key.toLowerCase()) {
-        case "c": // Copy
+        case "c":
           if (selectedText.start !== -1 && selectedText.end !== -1) {
             e.preventDefault();
             const textToCopy = getTextSelection();
@@ -155,26 +170,25 @@ export default function Home() {
             return;
           }
           break;
-        case "v": // Paste
+        case "v":
           e.preventDefault();
           navigator.clipboard.readText().then(clipText => {
-            // If text is selected, replace it
             if (selectedText.start !== -1 && selectedText.end !== -1) {
               const start = Math.min(selectedText.start, selectedText.end);
               const end = Math.max(selectedText.start, selectedText.end);
               setText(prev => prev.substring(0, start) + clipText + prev.substring(end));
               setCursorPosition(start + clipText.length);
             } else {
-              // Insert at cursor position
               setText(prev =>
                 prev.substring(0, cursorPosition) + clipText + prev.substring(cursorPosition)
               );
               setCursorPosition(cursorPosition + clipText.length);
             }
             clearSelection();
+            setTimeout(scrollCursorIntoView, 0);
           });
           return;
-        case "x": // Cut
+        case "x":
           if (selectedText.start !== -1 && selectedText.end !== -1) {
             e.preventDefault();
             const textToCut = getTextSelection();
@@ -187,11 +201,11 @@ export default function Home() {
             return;
           }
           break;
-        case "a": // Select all
+        case "a":
           e.preventDefault();
           setSelectedText({ start: 0, end: text.length });
           return;
-        case "z": // Undo
+        case "z":
           e.preventDefault();
           if (historyIndex > 0) {
             setHistoryIndex(prev => prev - 1);
@@ -200,7 +214,7 @@ export default function Home() {
             clearSelection();
           }
           return;
-        case "y": // Redo
+        case "y":
           e.preventDefault();
           if (historyIndex < history.length - 1) {
             setHistoryIndex(prev => prev + 1);
@@ -212,17 +226,14 @@ export default function Home() {
       }
     }
 
-    // Handle shift key for selection
     if (e.shiftKey) {
       switch (e.key) {
         case "ArrowLeft":
           e.preventDefault();
           if (cursorPosition > 0) {
-            // Start selection if none exists
             if (selectedText.start === -1) {
               setSelectedText({ start: cursorPosition, end: cursorPosition - 1 });
             } else {
-              // Extend selection
               setSelectedText(prev => ({ ...prev, end: cursorPosition - 1 }));
             }
             setCursorPosition(prev => prev - 1);
@@ -231,11 +242,9 @@ export default function Home() {
         case "ArrowRight":
           e.preventDefault();
           if (cursorPosition < text.length) {
-            // Start selection if none exists
             if (selectedText.start === -1) {
               setSelectedText({ start: cursorPosition, end: cursorPosition + 1 });
             } else {
-              // Extend selection
               setSelectedText(prev => ({ ...prev, end: cursorPosition + 1 }));
             }
             setCursorPosition(prev => prev + 1);
@@ -246,7 +255,6 @@ export default function Home() {
 
     e.preventDefault();
 
-    // Clear selection for most operations
     if (e.key !== "Shift" && !e.ctrlKey) {
       clearSelection();
     }
@@ -254,7 +262,6 @@ export default function Home() {
     switch (e.key) {
       case "Backspace":
         if (selectedText.start !== -1 && selectedText.end !== -1) {
-          // Delete selected text
           const start = Math.min(selectedText.start, selectedText.end);
           const end = Math.max(selectedText.start, selectedText.end);
           setText(prev => prev.substring(0, start) + prev.substring(end));
@@ -277,8 +284,7 @@ export default function Home() {
               prev.substring(cursorPosition + 1)
           );
         }
-        break;
-      case "Enter":
+        break; case "Enter":
         setText(
           (prev) =>
             prev.substring(0, cursorPosition) +
@@ -286,6 +292,7 @@ export default function Home() {
             prev.substring(cursorPosition)
         );
         setCursorPosition((prev) => prev + 1);
+        setTimeout(scrollCursorIntoView, 0);
         break;
       case "Tab":
         e.preventDefault();
@@ -381,9 +388,8 @@ export default function Home() {
           setCursorPosition((prev) => prev + 1);
         }
     }
-  };
-  const renderText = () => {
-    // If there's no selection, render as before
+  }; const renderText = () => {
+
     if (selectedText.start === -1 || selectedText.end === -1) {
       const beforeCursor = text.substring(0, cursorPosition);
       const afterCursor = text.substring(cursorPosition);
@@ -391,12 +397,11 @@ export default function Home() {
       return (
         <>
           <span>{beforeCursor}</span>
-          <span className="animate-pulse">|</span>
+          <span ref={cursorRef} className="animate-pulse">|</span>
           <span>{afterCursor}</span>
         </>
       );
     } else {
-      // Handle text with selection
       const start = Math.min(selectedText.start, selectedText.end);
       const end = Math.max(selectedText.start, selectedText.end);
 
@@ -408,9 +413,9 @@ export default function Home() {
         <>
           <span>{beforeSelection}</span>
           <span className="bg-blue-500 text-white">{selection}</span>
-          {cursorPosition === end && <span className="animate-pulse">|</span>}
+          {cursorPosition === end && <span ref={cursorRef} className="animate-pulse">|</span>}
           <span>{afterSelection}</span>
-          {cursorPosition !== end && <span className="animate-pulse">|</span>}
+          {cursorPosition !== end && <span ref={cursorRef} className="animate-pulse">|</span>}
         </>
       );
     }
@@ -425,15 +430,17 @@ export default function Home() {
       style={{ outline: "none" }}
     >      <div
       ref={textDisplayRef}
-      className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-2xl mx-auto p-6 rounded overflow-hidden"
+      className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-2xl mx-auto p-6 rounded"
       style={{
         overflowWrap: "break-word",
         wordWrap: "break-word",
         wordBreak: "break-word",
+        height: "70vh",
         maxHeight: "80vh",
         overflow: "auto",
-        userSelect: "none", // Prevent default browser selection
-        cursor: "text"
+        userSelect: "none",
+        cursor: "text",
+        scrollBehavior: "smooth"
       }}
       onClick={handleClick}
       onMouseDown={handleMouseDown}
@@ -441,6 +448,13 @@ export default function Home() {
       onMouseUp={handleMouseUp}
     >
         {renderText()}
+        <span
+          ref={cursorRef}
+          className="absolute text-white"
+          style={{ left: `${cursorPosition}px`, top: "50%", transform: "translateY(-50%)" }}
+        >
+          |
+        </span>
       </div>
     </div>
   );
