@@ -4,6 +4,9 @@ import React, { useState, useEffect, useRef } from "react";
 export default function Home() {
   const [text, setText] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [selectedText, setSelectedText] = useState({ start: -1, end: -1 });
+  const [history, setHistory] = useState<string[]>([""]);
+  const [historyIndex, setHistoryIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const textDisplayRef = useRef<HTMLDivElement>(null);
 
@@ -13,8 +16,29 @@ export default function Home() {
     }
   }, []);
 
-  const handleClick = (e: React.MouseEvent) => {
-    if (!textDisplayRef.current) return;
+  useEffect(() => {
+    if (text !== history[historyIndex]) {
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(text);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  }, [text]);
+
+  const getTextSelection = () => {
+    if (selectedText.start === -1 || selectedText.end === -1) {
+      return "";
+    }
+    const start = Math.min(selectedText.start, selectedText.end);
+    const end = Math.max(selectedText.start, selectedText.end);
+    return text.substring(start, end);
+  };
+
+  const clearSelection = () => {
+    setSelectedText({ start: -1, end: -1 });
+  };
+  const calculateClickPosition = (e: React.MouseEvent) => {
+    if (!textDisplayRef.current) return 0;
 
     const rect = textDisplayRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -30,20 +54,19 @@ export default function Home() {
         preRange.setStart(textDisplayRef.current, 0);
         preRange.setEnd(caretPosition.offsetNode, caretPosition.offset);
 
-        const selectedText = preRange.toString();
-        position = selectedText.length;
+        const textContent = preRange.toString();
+        position = textContent.length;
       }
     }
     else if (document.caretRangeFromPoint) {
       const range = document.caretRangeFromPoint(e.clientX, e.clientY);
       if (range) {
-
         const preRange = document.createRange();
         preRange.setStart(textDisplayRef.current, 0);
         preRange.setEnd(range.startContainer, range.startOffset);
 
-        const selectedText = preRange.toString();
-        position = selectedText.length;
+        const textContent = preRange.toString();
+        position = textContent.length;
       }
     }
     else {
@@ -65,19 +88,179 @@ export default function Home() {
       }
     }
 
-    setCursorPosition(Math.min(position, text.length));
+    return Math.min(position, text.length);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    const clickPosition = calculateClickPosition(e);
+
+    // Clear any existing selection unless shift is pressed
+    if (!e.shiftKey) {
+      clearSelection();
+    } else if (selectedText.start === -1) {
+      // If shift is pressed and no selection exists, start from current cursor
+      setSelectedText({ start: cursorPosition, end: clickPosition });
+    } else {
+      // If shift is pressed and selection exists, extend it
+      setSelectedText(prev => ({ ...prev, end: clickPosition }));
+    }
+
+    setCursorPosition(clickPosition);
 
     if (containerRef.current) {
       containerRef.current.focus();
     }
   };
 
+  // Add mouse events for drag selection
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const clickPosition = calculateClickPosition(e);
+    setCursorPosition(clickPosition);
+    setSelectedText({ start: clickPosition, end: clickPosition });
+
+    // Enable focus for keyboard events
+    if (containerRef.current) {
+      containerRef.current.focus();
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    // Only track movement if mouse button is pressed
+    if (e.buttons === 1 && selectedText.start !== -1) {
+      const movePosition = calculateClickPosition(e);
+      setSelectedText(prev => ({ ...prev, end: movePosition }));
+      setCursorPosition(movePosition);
+    }
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    const upPosition = calculateClickPosition(e);
+
+    // If no movement happened, clear selection
+    if (selectedText.start === selectedText.end) {
+      clearSelection();
+    }
+
+    setCursorPosition(upPosition);
+  };
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle keyboard shortcuts
+    if (e.ctrlKey) {
+      switch (e.key.toLowerCase()) {
+        case "c": // Copy
+          if (selectedText.start !== -1 && selectedText.end !== -1) {
+            e.preventDefault();
+            const textToCopy = getTextSelection();
+            navigator.clipboard.writeText(textToCopy);
+            return;
+          }
+          break;
+        case "v": // Paste
+          e.preventDefault();
+          navigator.clipboard.readText().then(clipText => {
+            // If text is selected, replace it
+            if (selectedText.start !== -1 && selectedText.end !== -1) {
+              const start = Math.min(selectedText.start, selectedText.end);
+              const end = Math.max(selectedText.start, selectedText.end);
+              setText(prev => prev.substring(0, start) + clipText + prev.substring(end));
+              setCursorPosition(start + clipText.length);
+            } else {
+              // Insert at cursor position
+              setText(prev =>
+                prev.substring(0, cursorPosition) + clipText + prev.substring(cursorPosition)
+              );
+              setCursorPosition(cursorPosition + clipText.length);
+            }
+            clearSelection();
+          });
+          return;
+        case "x": // Cut
+          if (selectedText.start !== -1 && selectedText.end !== -1) {
+            e.preventDefault();
+            const textToCut = getTextSelection();
+            navigator.clipboard.writeText(textToCut);
+            const start = Math.min(selectedText.start, selectedText.end);
+            const end = Math.max(selectedText.start, selectedText.end);
+            setText(prev => prev.substring(0, start) + prev.substring(end));
+            setCursorPosition(start);
+            clearSelection();
+            return;
+          }
+          break;
+        case "a": // Select all
+          e.preventDefault();
+          setSelectedText({ start: 0, end: text.length });
+          return;
+        case "z": // Undo
+          e.preventDefault();
+          if (historyIndex > 0) {
+            setHistoryIndex(prev => prev - 1);
+            setText(history[historyIndex - 1]);
+            setCursorPosition(history[historyIndex - 1].length);
+            clearSelection();
+          }
+          return;
+        case "y": // Redo
+          e.preventDefault();
+          if (historyIndex < history.length - 1) {
+            setHistoryIndex(prev => prev + 1);
+            setText(history[historyIndex + 1]);
+            setCursorPosition(history[historyIndex + 1].length);
+            clearSelection();
+          }
+          return;
+      }
+    }
+
+    // Handle shift key for selection
+    if (e.shiftKey) {
+      switch (e.key) {
+        case "ArrowLeft":
+          e.preventDefault();
+          if (cursorPosition > 0) {
+            // Start selection if none exists
+            if (selectedText.start === -1) {
+              setSelectedText({ start: cursorPosition, end: cursorPosition - 1 });
+            } else {
+              // Extend selection
+              setSelectedText(prev => ({ ...prev, end: cursorPosition - 1 }));
+            }
+            setCursorPosition(prev => prev - 1);
+          }
+          return;
+        case "ArrowRight":
+          e.preventDefault();
+          if (cursorPosition < text.length) {
+            // Start selection if none exists
+            if (selectedText.start === -1) {
+              setSelectedText({ start: cursorPosition, end: cursorPosition + 1 });
+            } else {
+              // Extend selection
+              setSelectedText(prev => ({ ...prev, end: cursorPosition + 1 }));
+            }
+            setCursorPosition(prev => prev + 1);
+          }
+          return;
+      }
+    }
+
     e.preventDefault();
+
+    // Clear selection for most operations
+    if (e.key !== "Shift" && !e.ctrlKey) {
+      clearSelection();
+    }
 
     switch (e.key) {
       case "Backspace":
-        if (cursorPosition > 0) {
+        if (selectedText.start !== -1 && selectedText.end !== -1) {
+          // Delete selected text
+          const start = Math.min(selectedText.start, selectedText.end);
+          const end = Math.max(selectedText.start, selectedText.end);
+          setText(prev => prev.substring(0, start) + prev.substring(end));
+          setCursorPosition(start);
+          clearSelection();
+        } else if (cursorPosition > 0) {
           setText(
             (prev) =>
               prev.substring(0, cursorPosition - 1) +
@@ -199,18 +382,38 @@ export default function Home() {
         }
     }
   };
-
   const renderText = () => {
-    const beforeCursor = text.substring(0, cursorPosition);
-    const afterCursor = text.substring(cursorPosition);
+    // If there's no selection, render as before
+    if (selectedText.start === -1 || selectedText.end === -1) {
+      const beforeCursor = text.substring(0, cursorPosition);
+      const afterCursor = text.substring(cursorPosition);
 
-    return (
-      <>
-        <span>{beforeCursor}</span>
-        <span className="animate-pulse">|</span>
-        <span>{afterCursor}</span>
-      </>
-    );
+      return (
+        <>
+          <span>{beforeCursor}</span>
+          <span className="animate-pulse">|</span>
+          <span>{afterCursor}</span>
+        </>
+      );
+    } else {
+      // Handle text with selection
+      const start = Math.min(selectedText.start, selectedText.end);
+      const end = Math.max(selectedText.start, selectedText.end);
+
+      const beforeSelection = text.substring(0, start);
+      const selection = text.substring(start, end);
+      const afterSelection = text.substring(end);
+
+      return (
+        <>
+          <span>{beforeSelection}</span>
+          <span className="bg-blue-500 text-white">{selection}</span>
+          {cursorPosition === end && <span className="animate-pulse">|</span>}
+          <span>{afterSelection}</span>
+          {cursorPosition !== end && <span className="animate-pulse">|</span>}
+        </>
+      );
+    }
   };
 
   return (
@@ -220,19 +423,23 @@ export default function Home() {
       onKeyDown={handleKeyDown}
       tabIndex={0}
       style={{ outline: "none" }}
+    >      <div
+      ref={textDisplayRef}
+      className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-2xl mx-auto p-6 rounded overflow-hidden"
+      style={{
+        overflowWrap: "break-word",
+        wordWrap: "break-word",
+        wordBreak: "break-word",
+        maxHeight: "80vh",
+        overflow: "auto",
+        userSelect: "none", // Prevent default browser selection
+        cursor: "text"
+      }}
+      onClick={handleClick}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
     >
-      <div
-        ref={textDisplayRef}
-        className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-2xl mx-auto p-6 rounded overflow-hidden"
-        style={{
-          overflowWrap: "break-word",
-          wordWrap: "break-word",
-          wordBreak: "break-word",
-          maxHeight: "80vh",
-          overflow: "auto",
-        }}
-        onClick={handleClick}
-      >
         {renderText()}
       </div>
     </div>
