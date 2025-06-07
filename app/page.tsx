@@ -12,6 +12,14 @@ export default function Home() {
   const cursorRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
+    document.body.style.minHeight = "100vh";
+    document.documentElement.style.minHeight = "100vh";
+
+    document.body.style.overflowY = "auto";
+    document.documentElement.style.overflowY = "auto";
+  }, []);
+
+  useEffect(() => {
     if (containerRef.current) {
       containerRef.current.focus();
     }
@@ -29,21 +37,12 @@ export default function Home() {
   useEffect(() => {
     scrollCursorIntoView();
   }, [cursorPosition, text]);
-
   const scrollCursorIntoView = () => {
-    if (cursorRef.current && textDisplayRef.current) {
-      const cursorElement = cursorRef.current;
-      const container = textDisplayRef.current;
-
-      const cursorRect = cursorElement.getBoundingClientRect();
-      const containerRect = container.getBoundingClientRect();
-
-      if (cursorRect.bottom > containerRect.bottom) {
-        container.scrollTop += cursorRect.bottom - containerRect.bottom + 20; // Add 20px margin
-      }
-      else if (cursorRect.top < containerRect.top) {
-        container.scrollTop -= containerRect.top - cursorRect.top + 20; // Add 20px margin
-      }
+    if (cursorRef.current) {
+      cursorRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      });
     }
   };
 
@@ -420,41 +419,31 @@ export default function Home() {
       );
     }
   };
-
   return (
     <div
       ref={containerRef}
-      className="flex flex-col items-center justify-center h-screen bg-black p-4"
+      className="flex flex-col items-center justify-center min-h-screen bg-black p-4"
       onKeyDown={handleKeyDown}
       tabIndex={0}
       style={{ outline: "none" }}
-    >      <div
-      ref={textDisplayRef}
-      className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-2xl mx-auto p-6 rounded"
-      style={{
-        overflowWrap: "break-word",
-        wordWrap: "break-word",
-        wordBreak: "break-word",
-        height: "70vh",
-        maxHeight: "80vh",
-        overflow: "auto",
-        userSelect: "none",
-        cursor: "text",
-        scrollBehavior: "smooth"
-      }}
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
     >
+      <div
+        ref={textDisplayRef}
+        className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-2xl mx-auto p-6 rounded"
+        style={{
+          overflowWrap: "break-word",
+          wordWrap: "break-word",
+          wordBreak: "break-word",
+          minHeight: "70vh",
+          userSelect: "none",
+          cursor: "text"
+        }}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+      >
         {renderText()}
-        <span
-          ref={cursorRef}
-          className="absolute text-white"
-          style={{ left: `${cursorPosition}px`, top: "50%", transform: "translateY(-50%)" }}
-        >
-          |
-        </span>
       </div>
     </div>
   );
