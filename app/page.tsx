@@ -419,17 +419,47 @@ export default function Home() {
       );
     }
   };
-  return (
+  const handleDownload = () => {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+
+    const date = new Date();
+    const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}_${date.getHours().toString().padStart(2, '0')}-${date.getMinutes().toString().padStart(2, '0')}`;
+    a.download = `my_text_${formattedDate}.txt`;
+
+    document.body.appendChild(a);
+    a.click();
+
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }; return (
     <div
       ref={containerRef}
-      className="flex flex-col items-center justify-center min-h-screen bg-black p-4"
+      className="flex flex-col items-center min-h-screen bg-black p-4 relative"
       onKeyDown={handleKeyDown}
       tabIndex={0}
       style={{ outline: "none" }}
     >
+      <div className="absolute top-4 right-4">
+        <button
+          onClick={handleDownload}
+          className="hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-md text-lg transition-colors duration-200 flex items-center"
+          style={{ boxShadow: "0 2px 4px rgba(0, 0, 0, 0.3)" }}
+          title="Download Text"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        </button>
+      </div>
+
       <div
         ref={textDisplayRef}
-        className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-2xl mx-auto p-6 rounded"
+        className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-4xl mx-auto p-6 rounded mt-12"
         style={{
           overflowWrap: "break-word",
           wordWrap: "break-word",
