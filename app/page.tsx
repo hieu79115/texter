@@ -457,24 +457,55 @@ export default function Home() {
         </>
       );
     }
-  };
-  const handleDownload = () => {
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  }; const handleDownload = () => {
+    try {
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
 
-    const url = URL.createObjectURL(blob);
+      const date = new Date();
+      const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}_${date.getHours().toString().padStart(2, '0')}-${date.getMinutes().toString().padStart(2, '0')}`;
+      const filename = `my_text_${formattedDate}.txt`;
 
-    const a = document.createElement('a');
-    a.href = url;
+      if ('showSaveFilePicker' in window) {
+        const saveFile = async () => {
+          try {
+            const fileHandle = await (window as any).showSaveFilePicker({
+              suggestedName: filename,
+              types: [{
+                description: 'Text Files',
+                accept: { 'text/plain': ['.txt'] },
+              }],
+            });
+            const writable = await fileHandle.createWritable();
 
-    const date = new Date();
-    const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}_${date.getHours().toString().padStart(2, '0')}-${date.getMinutes().toString().padStart(2, '0')}`;
-    a.download = `my_text_${formattedDate}.txt`;
+            await writable.write(blob);
 
-    document.body.appendChild(a);
-    a.click();
+            await writable.close();
+          } catch (err: any) {
+            if (err?.name !== 'AbortError') {
+              fallbackDownload();
+            }
+          }
+        };
+        saveFile();
+      } else {
+        fallbackDownload();
+      }
 
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+      function fallbackDownload() {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("Cannot download file, please try again.");
+    }
   }; return (
     <div
       ref={containerRef}
@@ -482,25 +513,26 @@ export default function Home() {
       onKeyDown={handleKeyDown}
       tabIndex={0}
       style={{ outline: "none" }}
-    >      <div className="absolute top-4 right-4 flex gap-3">
+    >
+      <h1 className="absolute top-4 left-10 text-white text-3xl font-bold">Texter</h1>
+      <div className="absolute top-4 right-4 flex gap-3">
         {/* Upload button */}
         <button
           onClick={triggerFileUpload}
           className="hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-md text-lg transition-colors duration-200 flex items-center"
           style={{ boxShadow: "0 2px 4px rgba(0, 0, 0, 0.3)" }}
-          title="Tải lên tệp văn bản"
+          title="upload a text file"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
         </button>
-
         {/* Download button */}
         <button
           onClick={handleDownload}
           className="hover:bg-gray-800 text-white font-bold py-2 px-4 rounded-md text-lg transition-colors duration-200 flex items-center"
           style={{ boxShadow: "0 2px 4px rgba(0, 0, 0, 0.3)" }}
-          title="Tải xuống văn bản"
+          title="download the text file"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
