@@ -506,7 +506,9 @@ export default function Home() {
       console.error("Download failed:", error);
       alert("Cannot download file, please try again.");
     }
-  }; return (
+  };
+
+  return (
     <div
       ref={containerRef}
       className="flex flex-col items-center min-h-screen bg-black p-4 relative"
@@ -515,6 +517,7 @@ export default function Home() {
       style={{ outline: "none" }}
     >
       <h1 className="absolute top-4 left-10 text-white text-3xl font-bold">Texter</h1>
+      
       <div className="absolute top-4 right-4 flex gap-3">
         {/* Upload button */}
         <button
@@ -527,6 +530,7 @@ export default function Home() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
           </svg>
         </button>
+        
         {/* Download button */}
         <button
           onClick={handleDownload}
