@@ -11,7 +11,28 @@ export default function Home() {
   const textDisplayRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLSpanElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  
+  // Load saved content on initial render
+  useEffect(() => {
+    const savedText = localStorage.getItem('texter-content');
+    const savedCursorPosition = localStorage.getItem('texter-cursor-position');
+    
+    if (savedText) {
+      setText(savedText);
+      
+      // Update history with saved content
+      setHistory([savedText]);
+      setHistoryIndex(0);
+      
+      // Restore cursor position if available
+      if (savedCursorPosition) {
+        const position = parseInt(savedCursorPosition, 10);
+        if (!isNaN(position) && position >= 0 && position <= savedText.length) {
+          setCursorPosition(position);
+        }
+      }
+    }
+  }, []);
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -20,25 +41,58 @@ export default function Home() {
       alert("only support (.txt)");
       return;
     }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const fileContent = event.target?.result as string;
-
-      if (text.length > 0) {
+      // If there's existing content, confirm before replacing
+    if (text.length > 0) {
+      const shouldReplace = confirm("There is existing content. Do you want to replace it with the new file?");
+      
+      if (!shouldReplace) {
+        // Cancel operation
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const fileContent = event.target?.result as string;
+        
+        // Add current text to history before replacing
         const newHistory = history.slice(0, historyIndex + 1);
         newHistory.push(text);
         setHistory(newHistory);
         setHistoryIndex(newHistory.length - 1);
-      }
+        
+        // Replace existing content
+        const newText = fileContent;
+        setText(newText);
+        setCursorPosition(0);
+        
+        setText(newText);
+        clearSelection();
+        
+        // Save the new content to localStorage
+        localStorage.setItem('texter-content', newText);
+      };
+      
+      reader.readAsText(file);
+    } else {
+      // No existing content, proceed with normal loading
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const fileContent = event.target?.result as string;
+        setText(fileContent);
+        setCursorPosition(0);
+        clearSelection();
+        
+        // Save the new content to localStorage
+        localStorage.setItem('texter-content', fileContent);
+      };
+      
+      reader.readAsText(file);
+    }
 
-      setText(fileContent);
-      setCursorPosition(0);
-      clearSelection();
-    };
-
-    reader.readAsText(file);
-
+    // Reset file input for future uploads
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -63,15 +117,24 @@ export default function Home() {
       containerRef.current.focus();
     }
   }, []);
-
   useEffect(() => {
     if (text !== history[historyIndex]) {
       const newHistory = history.slice(0, historyIndex + 1);
       newHistory.push(text);
       setHistory(newHistory);
       setHistoryIndex(newHistory.length - 1);
+      
+      // Save content to localStorage whenever it changes
+      localStorage.setItem('texter-content', text);
     }
   }, [text]);
+  
+  // Save cursor position whenever it changes
+  useEffect(() => {
+    if (text.length > 0) {
+      localStorage.setItem('texter-cursor-position', cursorPosition.toString());
+    }
+  }, [cursorPosition, text]);
 
   useEffect(() => {
     scrollCursorIntoView();
@@ -554,7 +617,7 @@ export default function Home() {
 
       <div
         ref={textDisplayRef}
-        className="text-white text-3xl whitespace-pre-wrap font-mono w-full max-w-4xl mx-auto p-6 rounded mt-12"
+        className="text-white text-xl whitespace-pre-wrap font-mono w-full max-w-4xl mx-auto p-6 rounded mt-12"
         style={{
           overflowWrap: "break-word",
           wordWrap: "break-word",
