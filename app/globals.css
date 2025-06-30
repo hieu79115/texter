@@ -26,3 +26,9 @@ html, body {
   scroll-behavior: smooth;
   overflow-y: auto;
 }
+
+input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: inherit !important;
+}
